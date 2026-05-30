@@ -1,4 +1,6 @@
-#include "common.h"
+#include <stdio.h>
+#include <stddef.h>
+#include <stdint.h>
 
 
 uint32_t memset(uint8_t* ptr, uint8_t c, uint32_t size)
@@ -61,4 +63,26 @@ char* strtok(char* str, char* pattern)
 
     cur_str = cur_str + len;
     return temp;
+}
+
+int main()
+{
+    char test[] = "Test Tested Tests Testing";
+    char pattern[] = " ";
+    char* token = strtok(test, pattern);
+    
+    while(token)
+    {
+        printf("%s\n", token);
+        token = strtok(NULL, pattern);
+    }
+
+    char* token = strtok(test, pattern);
+    
+    while(token)
+    {
+        printf("%s\n", token);
+        token = strtok(NULL, pattern);
+    }
+    
 }

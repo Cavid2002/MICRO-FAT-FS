@@ -7,7 +7,6 @@
 #define BLOCK_SIZE              512
 #define SECTOR_NUM              1
 
-
 #define FAT_MAGIC               0xFEFEFEFE
 #define FILE_NAME_MAX           20
 #define FAT_START               2
@@ -24,6 +23,10 @@
 #define FAT_TYPE_DIR            2
 #define FAT_TYPE_EXEC           3
 
+#define FAT_MODE_READ           (1 << 0)
+#define FAT_MODE_WRITE          (1 << 1)
+#define FAT_MODE_APPEND         (1 << 2)
+#define FAT_MODE_CREATE         (1 << 3)
 
 #define NULL_BLCK               0
 #define FAT_ERR_NOT_EXT         1
@@ -39,7 +42,7 @@ typedef struct
 {
     uint32_t fat_magic;
     uint32_t block_size;
-    uint32_t total_block_number;
+    uint32_t total_block_num;
     uint32_t fat_table_size;
     uint32_t free_block_num;
 } __attribute__((packed)) super_block;
@@ -72,7 +75,7 @@ typedef struct
 {
     super_block s_block;
     uint8_t block_buff[BLOCK_SIZE];
-} ;
+} fat_cb;
 
 uint32_t (*device_read)(uint32_t* buff, uint32_t lba);
 uint32_t (*device_write)(uint32_t* buff, uint32_t lba);
