@@ -6,6 +6,7 @@
 #define PART_START              0
 #define BLOCK_SIZE              512
 #define SECTOR_NUM              1
+#define MAX_OPEN_FILE           5
 
 #define FAT_MAGIC               0xFEFEFEFE
 #define FILE_NAME_MAX           20
@@ -40,17 +41,6 @@
 
 typedef struct
 {
-    uint32_t fat_magic;
-    uint32_t block_size;
-    uint32_t total_block_num;
-    uint32_t fat_table_size;
-    uint32_t free_block_num;
-} __attribute__((packed)) super_block;
-
-
-
-typedef struct
-{
     uint32_t block_num;
     uint32_t file_size;
     uint8_t type;
@@ -63,11 +53,9 @@ typedef struct
 
 typedef struct
 {
-    uint32_t file_size;
     uint32_t offset;
-    uint32_t start_block;
     uint32_t curr_block;
-    uint32_t dir_entry_block;
+    dir_entry fdir;
 } file_desc;
 
 
@@ -77,8 +65,19 @@ typedef struct
     uint8_t block_buff[BLOCK_SIZE];
 } fat_cb;
 
-uint32_t (*device_read)(uint32_t* buff, uint32_t lba);
-uint32_t (*device_write)(uint32_t* buff, uint32_t lba);
+typedef struct
+{
+    uint32_t fat_magic;
+    uint32_t block_size;
+    uint32_t total_block_num;
+    uint32_t fat_table_size;
+    uint32_t free_block_num;
+    dir_entry root;
+} __attribute__((packed)) super_block;
+
+
+uint32_t (*device_read)(uint32_t* buff, uint32_t lba, uint32_t sectors);
+uint32_t (*device_write)(uint32_t* buff, uint32_t lba, uint32_t sectors);
 uint32_t fat_file_write(file_desc* fd, uint8_t* buff, uint32_t size);
 uint32_t fat_file_read(file_desc* fd, uint8_t* buff, uint32_t size);
 

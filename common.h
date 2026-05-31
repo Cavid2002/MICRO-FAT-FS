@@ -1,5 +1,10 @@
+
+#ifdef _STRING_H
+#else
+
 #ifndef COMMON_H
 #define COMMON_H
+
 
 #include <stdint.h>
 #include <stddef.h>
@@ -11,3 +16,6 @@ uint32_t strlen(uint8_t* ptr);
 uint32_t strtok(char* str, char* pattern);
 
 #endif
+
+#endif
+
