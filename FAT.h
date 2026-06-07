@@ -13,7 +13,7 @@
 #define FAT_START               2
 #define ADR_PER_BLOCK           (BLOCK_SIZE / 4)
 #define DIR_PER_BLOCK           (BLOCK_SIZE / 32)
-#define MAX_FILE_NAME           20
+#define MAX_FILE_NAME           16
 #define EOC                     0xFFFFFFFF
 
 #define SEEK_SET                0
@@ -42,12 +42,13 @@
 typedef struct
 {
     uint32_t block_num;
+    uint32_t dir_block;
     uint32_t file_size;
     uint8_t type;
     uint8_t perms;
     uint8_t owner_id;
     uint8_t name_length;
-    char name[20];
+    char name[MAX_FILE_NAME];
 } __attribute__((packed)) dir_entry;
 
 

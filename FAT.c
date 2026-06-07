@@ -19,16 +19,16 @@ int fat_create(uint32_t part_start, uint32_t sector_num)
 
 }
 
-int fat_get_free_fd()
-{
-    uint8_t max = 1 << (MAX_OPEN_FILE - 1);
-    while(max)
+int fat_fdget()
+{  
+    uint32_t index = 0;
+    while(index < MAX_FILE_NAME)
     {
-        if(!(fd_bitmap & max))
+        if(!(fd_bitmap & 1 << index))
         {
-            return max;
+            return index;
         }
-        max = max >> 1;
+        index++;
     }
     return -1;
 }
@@ -55,6 +55,16 @@ uint32_t fat_alloc_block()
     return FAT_ERR_NO_SPC;
 }
 
+void fat_free_block(uint32_t block_num)
+{
+    uint32_t block_offset = block_num / ADR_PER_BLOCK;
+    uint32_t internal_offset = block_num % ADR_PER_BLOCK;
+    uint32_t* addr = block_buff;
+    device_read(block_buff, 1 + PART_START + block_offset, SECTOR_NUM);
+    addr[internal_offset] = 0;
+    device_write(block_buff, 1 + PART_START + block_offset, SECTOR_NUM);
+}
+
 uint32_t fat_next_block(uint32_t current_block)
 {
     uint32_t* addr = block_buff;
@@ -75,6 +85,106 @@ uint32_t fat_cluster_insert(uint32_t current, uint32_t next)
     addr[internal_offset] = next;
     return next;
 }
+
+int fat_dir_read(dir_entry* dir, dir_entry* res, char* name)
+{
+    uint32_t len = strlen(name);
+    uint32_t next = dir->block_num;
+    dir_entry* dirs = block_buff;
+    while(next != EOC)
+    {
+        device_read(block_buff, next, SECTOR_NUM);
+        for(int i = 0; i < DIR_PER_BLOCK; i++)
+        {
+            if(!memcmp(dirs[i].name, name, len))
+            {
+                *res = dirs[i];
+                return 0;
+            }
+        }
+        next = fat_next_block(next);
+    }
+    return -1;
+}
+
+int fat_dir_insert(dir_entry* dir, dir_entry* new_file)
+{
+    dir_entry* dirs = block_buff;
+    uint32_t next = dir->block_num;
+    uint32_t prev = next;
+    while(next != EOC)
+    {
+        device_read(block_buff, next, SECTOR_NUM);
+        for(int i = 0; i < DIR_PER_BLOCK; i++)
+        {
+            if(dirs[i].block_num == 0)
+            {
+                dirs[i] = *new_file;
+                device_write(block_buff, next, SECTOR_NUM);           
+                return 0;
+            }
+        }
+        prev = next;
+        next = fat_next_block(next);
+    }
+
+    next = fat_alloc_block();
+    if(fat_cluster_insert(prev, next) != 0) return -1;
+    
+    memset(block_buff, 0, BLOCK_SIZE);
+    memcpy(new_file, block_buff, sizeof(dir_entry));
+    device_write(block_buff, next, SECTOR_NUM);
+    return -1;
+}
+
+
+int fat_dir_update(dir_entry* fdir)
+{
+    dir_entry* dirs = block_buff;
+    uint32_t next = fdir->dir_block;
+    uint32_t prev = next;
+
+    while(next != EOC)
+    {
+        device_read(block_buff, next, SECTOR_NUM);
+        for(int i = 0; i < DIR_PER_BLOCK; i++)
+        {
+            if(dirs[i].block_num == fdir->block_num)
+            {
+                dirs[i] = *fdir;
+                device_write(block_buff, next, SECTOR_NUM);
+                return 0;
+            }
+        }
+        prev = next;
+        next = fat_next_block(next);
+    }
+    return -1;
+}
+
+int fat_dir_delete(dir_entry* fdir)
+{
+    uint32_t dir = fdir->dir_block;
+    dir_entry* dirs = block_buff;
+    uint32_t next = fdir->dir_block;
+    uint32_t prev = next;
+    while(next != EOC)
+    {
+        device_read(block_buff, next, SECTOR_NUM);
+        for(int i = 0; i < DIR_PER_BLOCK; i++)
+        {
+            if(dirs[i].block_num == fdir->block_num)
+            {
+                memset(dirs + i, 0, sizeof(dir_entry));
+                return 0;
+            }
+        }
+        prev = next;
+        next = fat_next_block(next);
+    }
+    return -1;
+}
+
 
 uint32_t fat_fread(int fdi, uint8_t* buff, uint32_t size)
 {
@@ -151,29 +261,8 @@ uint32_t fat_fwrite(int fdi, uint8_t* buff, uint32_t size)
     return res;    
 }
 
-dir_entry fat_dir_read(dir_entry* dir, char* name)
-{
-    uint32_t len = strlen(name);
-    uint32_t next = dir->block_num;
-    uint32_t stop = dir->file_size % DIR_PER_BLOCK;
-    dir_entry* dirs = block_buff;
-    while(dir->file_size > 0)
-    {
-        device_read(block_buff, next, SECTOR_NUM);
-        stop = DIR_PER_BLOCK;   
-        for(int i = 0; i < stop; i++)
-        {
-            if(!memcmp(dirs[i].name, name, len) && dirs[i].type == FAT_TYPE_DIR)
-            {
-                return dirs[i];
-            }
-        }
-        next = fat_next_block(next);
-    }
-    return (dir_entry){.block_num = FAT_ERR_PATH_ERR};
-}
 
-dir_entry fat_create_file(char* filename, uint8_t type)
+dir_entry fat_fcreate(char* filename, uint32_t dir_block, uint8_t type)
 {
     dir_entry new_file;
     uint32_t size = strlen(filename);
@@ -183,33 +272,9 @@ dir_entry fat_create_file(char* filename, uint8_t type)
     new_file.block_num = fat_alloc_block();
     new_file.file_size = size;
     new_file.type = type;
+    new_file.dir_block = dir_block;
     memcpy(filename, new_file.name, size);
     return new_file;
-}
-
-int fat_dir_write(dir_entry* dir, dir_entry* new_file)
-{
-    dir_entry* dirs = block_buff;
-    uint32_t next = dir->block_num;
-    for(int i = 0; i < dir->file_size / BLOCK_SIZE; i++)
-    {
-        next = fat_next_block(next);
-    }
-
-    if(dir->file_size % BLOCK_SIZE == 0)
-    {
-        uint32_t new_block = fat_alloc_block();
-        if(new_block == FAT_ERR_NO_SPC) return FAT_ERR_NO_SPC;
-        fat_cluster_insert(next, new_block);
-        memset(block_buff, 0, BLOCK_SIZE);
-        memcpy(&new_file, block_buff, sizeof(new_file));
-        device_write(block_buff, new_block, SECTOR_NUM);
-    }
-
-    device_read(block_buff, next, SECTOR_NUM);
-    dirs[dir->file_size % DIR_PER_BLOCK] = *new_file;
-    device_write(block_buff, next, SECTOR_NUM);
-    return 0;
 }
 
 
@@ -241,7 +306,7 @@ int fat_fopen(char* path, uint8_t mode)
     
     if(flag && (mode & FAT_MODE_CREATE))
     {
-        dir_entry new_file = fat_create_file(prev_token, FAT_TYPE_FILE);
+        dir_entry new_file = fat_fcreate(prev_token, FAT_TYPE_FILE);
         
         return fat_dir_write(&prev, &new_file);
     }
@@ -251,10 +316,11 @@ int fat_fopen(char* path, uint8_t mode)
 
 int fat_fclose(int fd)
 {
-    if(fd->offset < fd->file_size)
+    file_desc* file = fd_table + fd;
+    dir_entry* dirs = block_buff;
+    if(file->offset > file->fdir.file_size)
     {
-        return 0;
+        file->fdir.file_size = file->offset;
+        
     }
-
-    for(int i = 0; i )
 }
