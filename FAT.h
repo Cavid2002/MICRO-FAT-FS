@@ -32,13 +32,10 @@
 #define FAT_MODE_CREATE         (1 << 3)
 
 #define NULL_BLCK               0
-#define FAT_ERR_NOT_EXT         1
-#define FAT_ERR_NO_SPC          2
-#define FAT_ERR_PATH_ERR        3
+#define FAT_ERR_NOT_EXT         -1
+#define FAT_ERR_NO_SPC          -2
+#define FAT_ERR_PATH_ERR        -3
 
-#define FAT_FLAG_CREATE         1
-
-#define ROOT_DIR                2
 
 
 typedef struct
