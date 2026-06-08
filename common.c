@@ -1,30 +1,30 @@
 #include "common.h"
 
 
-uint32_t memset(uint8_t* ptr, uint8_t c, uint32_t size)
+uint32_t memset(void* ptr, uint8_t c, uint32_t size)
 {
     while(--size)
     {
-        ptr[size] = c;
+        ((uint8_t*)ptr)[size] = c;
     }
     return size;
 }
 
-uint32_t memcpy(uint8_t* src, uint8_t* dest, uint32_t count)
+uint32_t memcpy(void* src, void* dest, uint32_t count)
 {
     uint32_t i;
     for(i = 0; i < count; i++)
     {
-        dest[i] = src[i];
+        ((uint8_t*)dest)[i] = ((uint8_t*)src)[i];
     }
     return 0;
 }
 
-int memcmp(uint8_t* ptr1, uint8_t* ptr2, uint32_t count)
+int memcmp(void* ptr1, void* ptr2, uint32_t count)
 {
     for(int i = 0; i < count; i++)
     {
-        if(ptr1[i] != ptr2[i]) return ptr1[i] - ptr2[i];
+        if(((uint8_t*)ptr1)[i] != ((uint8_t*)ptr2)[i]) return ((uint8_t*)ptr1)[i] - ((uint8_t*)ptr2)[i];
     }
     return 0;
 }
@@ -32,7 +32,7 @@ int memcmp(uint8_t* ptr1, uint8_t* ptr2, uint32_t count)
 uint32_t strlen(uint8_t* ptr)
 {
     uint32_t len = 0;
-    while(ptr[len])
+    while(((uint8_t*)ptr)[len])
     {
         len++;
     }

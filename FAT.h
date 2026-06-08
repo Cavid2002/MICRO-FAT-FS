@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define PART_START              0
+
 #define BLOCK_SIZE              512
 #define SECTOR_NUM              1
 
@@ -18,9 +18,9 @@
 #define MAX_FILE_NAME           16
 #define EOC                     0xFFFFFFFF
 
-#define SEEK_SET                0
-#define SEEK_CUR                1
-#define SEEK_END                2
+#define FAT_SEEK_SET                0
+#define FAT_SEEK_CUR                1
+#define FAT_SEEK_END                2
 
 #define FAT_TYPE_FILE           1
 #define FAT_TYPE_DIR            2
@@ -62,12 +62,6 @@ typedef struct
 
 typedef struct
 {
-    super_block s_block;
-    uint8_t block_buff[BLOCK_SIZE];
-} fat_cb;
-
-typedef struct
-{
     uint32_t fat_magic;
     uint32_t block_size;
     uint32_t total_block_num;
@@ -77,8 +71,15 @@ typedef struct
 } __attribute__((packed)) super_block;
 
 
-uint32_t (*device_read)(uint32_t* buff, uint32_t lba, uint32_t sectors);
-uint32_t (*device_write)(uint32_t* buff, uint32_t lba, uint32_t sectors);
+typedef struct
+{
+    super_block s_block;
+    uint8_t block_buff[BLOCK_SIZE];
+} fat_cb;
+
+
+uint32_t (*device_read)(uint8_t* buff, uint32_t lba, uint32_t sectors);
+uint32_t (*device_write)(uint8_t* buff, uint32_t lba, uint32_t sectors);
 
 
 

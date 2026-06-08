@@ -1,36 +1,39 @@
-#include "FAT.h"
 #include "common.h"
+#include "FAT.h"
 
-static super_block sb;
+static super_block* sb;
 static uint8_t* block_buff;
+static uint32_t fat_offset;
 
-int fat_mount(fat_cb* cb)
+int fat_mount(fat_cb* cb, uint32_t part_start)
 {
-    sb = cb->s_block;
+    fat_offset = part_start + 1;
+    sb = &cb->s_block;
     block_buff = cb->block_buff;
-    device_read(block_buff, PART_START, SECTOR_NUM);
+    device_read(block_buff, part_start, SECTOR_NUM);
     memcpy(block_buff, &sb, sizeof(super_block));
-    return sb.fat_magic == FAT_MAGIC;
+    return sb->fat_magic == FAT_MAGIC;
 }
 
 int fat_create(uint32_t part_start, uint32_t sector_num)
 {
-    sb.fat_magic = FAT_MAGIC;
-    sb.block_size = BLOCK_SIZE;
-    sb.total_block_num = sector_num * 512 / BLOCK_SIZE;
-    sb.fat_table_size = (sb.total_block_num * 4 + BLOCK_SIZE - 1) / BLOCK_SIZE;
-    sb.free_block_num = sb.total_block_num - sb.fat_table_size - 1;
-    sb.root.block_num = FAT_OFFSET + sb.fat_table_size;
-    sb.root.file_size = 0;
-    sb.root.type = FAT_TYPE_DIR;
-    sb.root.dir_block = FAT_OFFSET + sb.fat_table_size;
+    fat_offset = part_start + 1;
+    sb->fat_magic = FAT_MAGIC;
+    sb->block_size = BLOCK_SIZE;
+    sb->total_block_num = sector_num * 512 / BLOCK_SIZE;
+    sb->fat_table_size = (sb->total_block_num * 4 + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    sb->free_block_num = sb->total_block_num - sb->fat_table_size - 1;
+    sb->root.block_num = fat_offset + sb->fat_table_size;
+    sb->root.file_size = 0;
+    sb->root.type = FAT_TYPE_DIR;
+    sb->root.dir_block = fat_offset + sb->fat_table_size;
 
     memset(block_buff, 0, BLOCK_SIZE);
-    for(int i = 0; i < sb.fat_table_size + 1; i++)
+    for(int i = 0; i < sb->fat_table_size + 1; i++)
     {
-        device_write(block_buff, FAT_OFFSET + i, SECTOR_NUM);
+        device_write(block_buff, fat_offset + i, SECTOR_NUM);
     }
-    device_write((uint8_t*)&sb, PART_START, SECTOR_NUM);
+    device_write((uint8_t*)&sb, part_start, SECTOR_NUM);
     return 0;
 }
 
@@ -38,19 +41,19 @@ int fat_create(uint32_t part_start, uint32_t sector_num)
 uint32_t fat_alloc_block()
 {
     uint32_t* addr = block_buff;
-    uint32_t next = sb.total_block_num - sb.free_block_num;
+    uint32_t next = sb->total_block_num - sb->free_block_num;
     uint32_t block_offset = next / ADR_PER_BLOCK;
     uint32_t internal_offset = next % ADR_PER_BLOCK;
-    for(int i = block_offset; i < sb.total_block_num; i++)
+    for(int i = block_offset; i < sb->total_block_num; i++)
     {
-        device_read(block_buff, PART_START + i + 1, SECTOR_NUM);
+        device_read(block_buff, fat_offset + i, SECTOR_NUM);
         for(int j = internal_offset; j < ADR_PER_BLOCK; j++)
         {
             if(addr[j] == 0)
             {
                 addr[j] = EOC;
-                device_write(block_buff, PART_START + i + 1, SECTOR_NUM);
-                return (PART_START + i + 1) * ADR_PER_BLOCK + j;
+                device_write(block_buff, fat_offset + i, SECTOR_NUM);
+                return (fat_offset + i) * ADR_PER_BLOCK + j;
             }
         }
     }
@@ -62,9 +65,9 @@ void fat_free_block(uint32_t block_num)
     uint32_t block_offset = block_num / ADR_PER_BLOCK;
     uint32_t internal_offset = block_num % ADR_PER_BLOCK;
     uint32_t* addr = block_buff;
-    device_read(block_buff, FAT_OFFSET + block_offset, SECTOR_NUM);
+    device_read(block_buff, fat_offset + block_offset, SECTOR_NUM);
     addr[internal_offset] = 0;
-    device_write(block_buff, FAT_OFFSET + block_offset, SECTOR_NUM);
+    device_write(block_buff, fat_offset + block_offset, SECTOR_NUM);
 }
 
 uint32_t fat_next_block(uint32_t current_block)
@@ -73,7 +76,7 @@ uint32_t fat_next_block(uint32_t current_block)
     uint32_t block_offset = current_block / ADR_PER_BLOCK;
     uint32_t internal_offset = current_block % ADR_PER_BLOCK;
     memset(block_buff, 0, BLOCK_SIZE);
-    device_read(block_buff, FAT_OFFSET + block_offset, SECTOR_NUM);
+    device_read(block_buff, fat_offset + block_offset, SECTOR_NUM);
     return addr[internal_offset];
 }
 
@@ -83,7 +86,7 @@ uint32_t fat_cluster_insert(uint32_t current, uint32_t next)
     uint32_t block_offset = current / ADR_PER_BLOCK;
     uint32_t internal_offset = current % ADR_PER_BLOCK;
     memset(block_buff, 0, BLOCK_SIZE);
-    device_read(block_buff, FAT_OFFSET + block_offset, SECTOR_NUM);
+    device_read(block_buff, fat_offset + block_offset, SECTOR_NUM);
     addr[internal_offset] = next;
     return next;
 }
@@ -222,6 +225,36 @@ uint32_t fat_fread(file_desc* fd, uint8_t* buff, uint32_t size)
 
 }
 
+uint32_t fat_fseek(file_desc* fd, uint32_t offset, uint32_t position)
+{
+    uint32_t new_offset;
+    switch(position)
+    {
+        case FAT_SEEK_SET:
+            new_offset = offset;
+            break;
+        case FAT_SEEK_CUR:
+            new_offset = fd->offset + offset;
+            break;
+        case FAT_SEEK_END:
+            new_offset = fd->fdir.file_size + offset;
+            break;
+        default:
+            return -1;
+    }
+
+    if(new_offset > fd->fdir.file_size) return -1;
+
+    uint32_t block_num = new_offset / BLOCK_SIZE;
+    uint32_t next_block = fd->fdir.block_num;
+    for(int i = 0; i < block_num; i++)
+    {
+        next_block = fat_next_block(next_block);
+    }
+    fd->curr_block = next_block;
+    fd->offset = new_offset;
+    return new_offset;
+}
 
 uint32_t fat_fwrite(file_desc* fd, uint8_t* buff, uint32_t size)
 {
@@ -237,10 +270,10 @@ uint32_t fat_fwrite(file_desc* fd, uint8_t* buff, uint32_t size)
         if(size < bytes_to_write) bytes_to_write = size;
 
         if(internal_offset != 0)
-            disk_read(block_buff, next_block, SECTOR_NUM);
+            device_read(block_buff, next_block, SECTOR_NUM);
 
         memcpy(buff, block_buff + internal_offset, bytes_to_write);
-        disk_write(block_buff, next_block, SECTOR_NUM);
+        device_write(block_buff, next_block, SECTOR_NUM);
 
         buff += bytes_to_write;
         size -= bytes_to_write;
@@ -250,7 +283,7 @@ uint32_t fat_fwrite(file_desc* fd, uint8_t* buff, uint32_t size)
         temp = fat_next_block(next_block);
         if(temp == EOC)
         {
-            temp = alloc_block();
+            temp = fat_alloc_block();
             fat_cluster_insert(next_block, temp);
         }
 
@@ -280,7 +313,7 @@ dir_entry fat_fcreate(char* filename, uint32_t dir_block, uint8_t type)
 int fat_fopen(file_desc* fd, char* path, uint8_t mode)
 {
     char* token = strtok(path, "/");
-    dir_entry next = sb.root;
+    dir_entry next = sb->root;
     dir_entry res = next;
     uint8_t flag = 0;
     while(token)
