@@ -32,7 +32,7 @@ int memcmp(void* ptr1, void* ptr2, uint32_t count)
 uint32_t strlen(uint8_t* ptr)
 {
     uint32_t len = 0;
-    while(((uint8_t*)ptr)[len])
+    while(ptr[len])
     {
         len++;
     }

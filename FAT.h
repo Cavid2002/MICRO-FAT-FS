@@ -78,8 +78,8 @@ typedef struct
 } fat_cb;
 
 
-uint32_t (*device_read)(uint8_t* buff, uint32_t lba, uint32_t sectors);
-uint32_t (*device_write)(uint8_t* buff, uint32_t lba, uint32_t sectors);
+extern uint32_t (*device_read)(uint8_t* buff, uint32_t lba, uint32_t sectors);
+extern uint32_t (*device_write)(uint8_t* buff, uint32_t lba, uint32_t sectors);
 
 
 

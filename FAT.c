@@ -1,6 +1,8 @@
 #include "common.h"
 #include "FAT.h"
 
+uint32_t (*device_read)(uint8_t* buff, uint32_t lba, uint32_t sectors);
+uint32_t (*device_write)(uint8_t* buff, uint32_t lba, uint32_t sectors);
 static super_block* sb;
 static uint8_t* block_buff;
 static uint32_t fat_offset;
@@ -40,7 +42,7 @@ int fat_create(uint32_t part_start, uint32_t sector_num)
 
 uint32_t fat_alloc_block()
 {
-    uint32_t* addr = block_buff;
+    uint32_t* addr = (uint32_t*)block_buff;
     uint32_t next = sb->total_block_num - sb->free_block_num;
     uint32_t block_offset = next / ADR_PER_BLOCK;
     uint32_t internal_offset = next % ADR_PER_BLOCK;
@@ -64,7 +66,7 @@ void fat_free_block(uint32_t block_num)
 {
     uint32_t block_offset = block_num / ADR_PER_BLOCK;
     uint32_t internal_offset = block_num % ADR_PER_BLOCK;
-    uint32_t* addr = block_buff;
+    uint32_t* addr = (uint32_t*)block_buff;
     device_read(block_buff, fat_offset + block_offset, SECTOR_NUM);
     addr[internal_offset] = 0;
     device_write(block_buff, fat_offset + block_offset, SECTOR_NUM);
@@ -72,7 +74,7 @@ void fat_free_block(uint32_t block_num)
 
 uint32_t fat_next_block(uint32_t current_block)
 {
-    uint32_t* addr = block_buff;
+    uint32_t* addr = (uint32_t*)block_buff;
     uint32_t block_offset = current_block / ADR_PER_BLOCK;
     uint32_t internal_offset = current_block % ADR_PER_BLOCK;
     memset(block_buff, 0, BLOCK_SIZE);
@@ -82,7 +84,7 @@ uint32_t fat_next_block(uint32_t current_block)
 
 uint32_t fat_cluster_insert(uint32_t current, uint32_t next)
 {
-    uint32_t* addr = block_buff;
+    uint32_t* addr = (uint32_t*)block_buff;
     uint32_t block_offset = current / ADR_PER_BLOCK;
     uint32_t internal_offset = current % ADR_PER_BLOCK;
     memset(block_buff, 0, BLOCK_SIZE);
@@ -95,7 +97,7 @@ int fat_dir_read(dir_entry* dir, dir_entry* res, char* name)
 {
     uint32_t len = strlen(name);
     uint32_t next = dir->block_num;
-    dir_entry* dirs = block_buff;
+    dir_entry* dirs = (dir_entry*)block_buff;
     while(next != EOC)
     {
         device_read(block_buff, next, SECTOR_NUM);
@@ -114,7 +116,7 @@ int fat_dir_read(dir_entry* dir, dir_entry* res, char* name)
 
 int fat_dir_insert(dir_entry* dir, dir_entry* new_file)
 {
-    dir_entry* dirs = block_buff;
+    dir_entry* dirs = (dir_entry*)block_buff;
     uint32_t next = dir->block_num;
     uint32_t prev = next;
     while(next != EOC)
@@ -145,7 +147,7 @@ int fat_dir_insert(dir_entry* dir, dir_entry* new_file)
 
 int fat_dir_update(dir_entry* fdir)
 {
-    dir_entry* dirs = block_buff;
+    dir_entry* dirs = (dir_entry*)block_buff;
     uint32_t next = fdir->dir_block;
     uint32_t prev = next;
 
@@ -170,7 +172,7 @@ int fat_dir_update(dir_entry* fdir)
 int fat_dir_delete(dir_entry* fdir)
 {
     uint32_t dir = fdir->dir_block;
-    dir_entry* dirs = block_buff;
+    dir_entry* dirs = (dir_entry*)block_buff;
     uint32_t next = fdir->dir_block;
     uint32_t prev = next;
     while(next != EOC)
@@ -356,25 +358,43 @@ int fat_fclose(file_desc* fd)
     if(fd->mode & FAT_MODE_WRITE)
     {
         if(fd->offset == fd->fdir.file_size)
-        {
             return 0;
-        }
-
-        if(fd->offset < fd->fdir.file_size)
-        {
-            uint32_t next = fat_next_block(fd->curr_block);
-            while(next != EOC)
-            {
-                fat_free_block(fd->curr_block);
-                fd->curr_block = next;
-                next = fat_next_block(next);
-            }
-            fat_free_block(fd->curr_block);
-
-        }
-        fd->fdir.file_size = fd->offset;
+        if(fd->offset > fd->fdir.file_size)
+            fd->fdir.file_size = fd->offset;
         return fat_dir_update(&fd->fdir);
     }
+
+    return 0;
+}
+
+int fat_ftrunc(file_desc* fd, uint32_t size)
+{
+    uint32_t next = fd->fdir.block_num;
+    uint32_t prev = next;
+    
+    for(int i = 0; i < size / BLOCK_SIZE; i++)
+    {
+        if(next == EOC)
+        {
+            next = fat_alloc_block();
+            fat_cluster_insert(prev, next);
+        }
+        prev = next;
+        next = fat_next_block(next);
+    }
+
+    if(fd->fdir.file_size > size)
+    {
+         while(next != EOC)
+        {
+            prev = next;
+            next = fat_next_block(next);
+            fat_free_block(prev);
+        }   
+    }
+   
+    fd->fdir.file_size = size;
+    fd->offset = size;
 
     return 0;
 }
