@@ -18,9 +18,9 @@
 #define MAX_FILE_NAME           16
 #define EOC                     0xFFFFFFFF
 
-#define FAT_SEEK_SET                0
-#define FAT_SEEK_CUR                1
-#define FAT_SEEK_END                2
+#define FAT_SEEK_SET            0
+#define FAT_SEEK_CUR            1
+#define FAT_SEEK_END            2
 
 #define FAT_TYPE_FILE           1
 #define FAT_TYPE_DIR            2
@@ -74,7 +74,6 @@ typedef struct
 typedef struct
 {
     super_block s_block;
-    uint32_t part_start;
     uint8_t block_buff[BLOCK_SIZE];
 } fat_cb;
 
