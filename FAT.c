@@ -5,12 +5,12 @@ static super_block* sb;
 static uint8_t* block_buff;
 static uint32_t fat_offset;
 
-int fat_mount(fat_cb* cb, uint32_t part_start)
+int fat_mount(fat_cb* cb)
 {
-    fat_offset = part_start + 1;
+    fat_offset = cb->part_start + 1;
     sb = &cb->s_block;
     block_buff = cb->block_buff;
-    device_read(block_buff, part_start, SECTOR_NUM);
+    device_read(block_buff, cb->part_start, SECTOR_NUM);
     memcpy(block_buff, &sb, sizeof(super_block));
     return sb->fat_magic == FAT_MAGIC;
 }

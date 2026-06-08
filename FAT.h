@@ -74,6 +74,7 @@ typedef struct
 typedef struct
 {
     super_block s_block;
+    uint32_t part_start;
     uint8_t block_buff[BLOCK_SIZE];
 } fat_cb;
 
