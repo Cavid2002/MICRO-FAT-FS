@@ -376,6 +376,5 @@ int fat_fclose(file_desc* fd)
         return fat_dir_update(&fd->fdir);
     }
 
-
     return 0;
 }
