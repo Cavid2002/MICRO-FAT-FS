@@ -13,29 +13,35 @@ int fat_mount(fat_cb* cb, uint32_t part_start)
     sb = &cb->s_block;
     block_buff = cb->block_buff;
     device_read(block_buff, part_start, SECTOR_NUM);
-    memcpy(block_buff, &sb, sizeof(super_block));
+    memcpy(block_buff, sb, sizeof(super_block));
     return sb->fat_magic == FAT_MAGIC;
 }
 
-int fat_create(uint32_t part_start, uint32_t sector_num)
+int fat_create(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
 {
+    fat_offset = part_start + 1;
+    sb = &cb->s_block;
+    block_buff = cb->block_buff;
     fat_offset = part_start + 1;
     sb->fat_magic = FAT_MAGIC;
     sb->block_size = BLOCK_SIZE;
     sb->total_block_num = sector_num * 512 / BLOCK_SIZE;
     sb->fat_table_size = (sb->total_block_num * 4 + BLOCK_SIZE - 1) / BLOCK_SIZE;
     sb->free_block_num = sb->total_block_num - sb->fat_table_size - 1;
-    sb->root.block_num = fat_offset + sb->fat_table_size;
-    sb->root.file_size = 0;
-    sb->root.type = FAT_TYPE_DIR;
-    sb->root.dir_block = fat_offset + sb->fat_table_size;
-
     memset(block_buff, 0, BLOCK_SIZE);
     for(int i = 0; i < sb->fat_table_size + 1; i++)
     {
         device_write(block_buff, fat_offset + i, SECTOR_NUM);
     }
-    device_write((uint8_t*)&sb, part_start, SECTOR_NUM);
+
+
+    sb->root.block_num = fat_offset + sb->fat_table_size;
+    sb->root.file_size = 0;
+    sb->root.type = FAT_TYPE_DIR;
+    sb->root.dir_block = fat_offset + sb->fat_table_size;
+
+    memcpy(sb, block_buff, sizeof(super_block));
+    device_write(block_buff, part_start, SECTOR_NUM);
     return 0;
 }
 
@@ -98,6 +104,13 @@ int fat_dir_read(dir_entry* dir, dir_entry* res, char* name)
     uint32_t len = strlen(name);
     uint32_t next = dir->block_num;
     dir_entry* dirs = (dir_entry*)block_buff;
+
+    if(len == 0)
+    {
+        *res = *dir;
+        return 0;
+    }
+
     while(next != EOC)
     {
         device_read(block_buff, next, SECTOR_NUM);
@@ -296,7 +309,7 @@ uint32_t fat_fwrite(file_desc* fd, uint8_t* buff, uint32_t size)
 }
 
 
-dir_entry fat_fcreate(char* filename, uint32_t dir_block, uint8_t type)
+dir_entry fat_new_dir_entry(char* filename, uint32_t dir_block, uint8_t type)
 {
     dir_entry new_file;
     uint32_t size = strlen(filename);
@@ -311,6 +324,38 @@ dir_entry fat_fcreate(char* filename, uint32_t dir_block, uint8_t type)
     return new_file;
 }
 
+int fat_fcreate(char* path, uint8_t type)
+{
+    char* token = strtok(path, "/");
+    dir_entry next = sb->root;
+    dir_entry res = next;
+    uint8_t flag = 0;
+
+    while(token)
+    {
+        if(fat_dir_read(&next, &res, token) != 0)
+        {
+            flag = 1;
+            break;
+        }
+
+        token = strtok(NULL, token);
+        next = res;
+    }
+
+    if(flag == 0)
+    {
+        return FAT_ERR_EXT;
+    }
+
+    if(strtok(NULL, token) && flag)
+    {
+        return FAT_ERR_PATH_ERR;
+    }
+
+    res = fat_new_dir_entry(token, next.dir_block, type);
+    return 0;
+}
 
 int fat_fopen(file_desc* fd, char* path, uint8_t mode)
 {
@@ -342,7 +387,7 @@ int fat_fopen(file_desc* fd, char* path, uint8_t mode)
 
     if(flag && (mode & FAT_MODE_CREATE))
     {
-        res = fat_fcreate(token, next.block_num, FAT_TYPE_FILE);
+        res = fat_new_dir_entry(token, next.block_num, FAT_TYPE_FILE);
         if(fat_dir_insert(&next, &res) != 0) return -1;
         fd->fdir = res;
         fd->curr_block = res.block_num;
@@ -371,7 +416,7 @@ int fat_ftrunc(file_desc* fd, uint32_t size)
 {
     uint32_t next = fd->fdir.block_num;
     uint32_t prev = next;
-    
+
     for(int i = 0; i < size / BLOCK_SIZE; i++)
     {
         if(next == EOC)
@@ -385,14 +430,14 @@ int fat_ftrunc(file_desc* fd, uint32_t size)
 
     if(fd->fdir.file_size > size)
     {
-         while(next != EOC)
+        while(next != EOC)
         {
             prev = next;
             next = fat_next_block(next);
             fat_free_block(prev);
-        }   
+        }
     }
-   
+
     fd->fdir.file_size = size;
     fd->offset = size;
 

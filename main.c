@@ -5,24 +5,57 @@
 
 FILE* disk;
 
-uint32_t file_write(uint8_t* buff, uint32_t lba, uint32_t sectors)
+int disk_start()
 {
-    fwrite(buff, 1, BLOCK_SIZE, disk);
-    return BLOCK_SIZE;
+    disk = fopen("disk.bin", "r+");
+    if(disk == NULL) return 1;
+    return 0;
 }
 
-uint32_t file_read(uint8_t* buff, uint32_t lba, uint32_t sectors)
+uint32_t disk_write(uint8_t* buff, uint32_t lba, uint32_t sectors)
 {
-    fread(buff, 1, BLOCK_SIZE, disk);
-    return BLOCK_SIZE;
+    fseek(disk, lba * BLOCK_SIZE, SEEK_SET);
+    return fwrite(buff, 1, BLOCK_SIZE * sectors, disk);
+}
+
+uint32_t disk_read(uint8_t* buff, uint32_t lba, uint32_t sectors)
+{
+    fseek(disk, lba * BLOCK_SIZE, SEEK_SET);
+    return fread(buff, 1, BLOCK_SIZE * sectors, disk);
+}
+
+
+void disk_stop()
+{
+    fclose(disk);
 }
 
 int main()
 {
-    disk = fopen("disk.bin", "r+");
-    device_read = file_read;
-    device_write = file_write;
+    disk_start();
+    device_read = disk_read;
+    device_write = disk_write;
 
+    fat_cb cb;
 
+    // fat_create(&cb, 0, 65536);
+    if(fat_mount(&cb, 0))
+    {
+        printf("FAT DETECTED!!\n");
+    }
+
+    file_desc fd;
+    char path[] = "/test.txt";
+    if(fat_fopen(&fd, path, FAT_MODE_CREATE | FAT_MODE_WRITE) == 0)
+    {
+        printf("FILE OPENED!\n");
+    }
+    else
+    {
+        printf("FAIL\n");
+    }
+
+    disk_stop();
+    return 0;
 
 }

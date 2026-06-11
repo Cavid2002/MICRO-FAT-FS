@@ -30,12 +30,13 @@
 #define FAT_MODE_WRITE          (1 << 1)
 #define FAT_MODE_APPEND         (1 << 2)
 #define FAT_MODE_CREATE         (1 << 3)
+#define FAT_MODE_TRUNC          (1 << 4)
 
 #define NULL_BLCK               0
 #define FAT_ERR_NOT_EXT         -1
 #define FAT_ERR_NO_SPC          -2
 #define FAT_ERR_PATH_ERR        -3
-
+#define FAT_ERR_EXT             -4
 
 
 typedef struct
@@ -81,6 +82,25 @@ typedef struct
 extern uint32_t (*device_read)(uint8_t* buff, uint32_t lba, uint32_t sectors);
 extern uint32_t (*device_write)(uint8_t* buff, uint32_t lba, uint32_t sectors);
 
+static super_block* sb;
+static uint8_t* block_buff;
+static uint32_t fat_offset;
 
+int fat_mount(fat_cb* cb, uint32_t part_start);
+int fat_create(fat_cb* cb, uint32_t part_start, uint32_t sector_num);
+uint32_t fat_alloc_block();
+void fat_free_block(uint32_t block_num);
+uint32_t fat_next_block(uint32_t current_block);
+uint32_t fat_cluster_insert(uint32_t current, uint32_t next);
+int fat_dir_insert(dir_entry* dir, dir_entry* new_file);
+int fat_dir_update(dir_entry* fdir);
+int fat_dir_delete(dir_entry* fdir);
+uint32_t fat_fread(file_desc* fd, uint8_t* buff, uint32_t size);
+uint32_t fat_fseek(file_desc* fd, uint32_t offset, uint32_t position);
+uint32_t fat_fwrite(file_desc* fd, uint8_t* buff, uint32_t size);
+int fat_fcreate(char* path, uint8_t type);
+int fat_fopen(file_desc* fd, char* path, uint8_t mode);
+int fat_fclose(file_desc* fd);
+int fat_ftrunc(file_desc* fd, uint32_t size);
 
 #endif
