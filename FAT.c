@@ -17,6 +17,17 @@ int fat_mount(fat_cb* cb, uint32_t part_start)
     return sb->fat_magic == FAT_MAGIC;
 }
 
+int fat_umount(fat_cb* cb)
+{
+    if(&cb->s_block != sb) return -1;
+    if(memcmp(sb, &cb->s_block, sizeof(super_block)) == 0) return 0;
+
+    memset(block_buff, 0, BLOCK_SIZE);
+    memcpy(sb, block_buff, sizeof(super_block));
+    device_write(block_buff, fat_offset - 1, SECTOR_NUM);
+    return 0;
+}
+
 int fat_create(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
 {
     fat_offset = part_start + 1;
@@ -29,12 +40,18 @@ int fat_create(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
     sb->fat_table_size = (sb->total_block_num * 4 + BLOCK_SIZE - 1) / BLOCK_SIZE;
     sb->free_block_num = sb->total_block_num - sb->fat_table_size - 1;
     memset(block_buff, 0, BLOCK_SIZE);
+
     for(int i = 0; i < sb->fat_table_size + 1; i++)
     {
         device_write(block_buff, fat_offset + i, SECTOR_NUM);
     }
 
-
+    uint32_t temp = sb->fat_table_size * 4  + BLOCK_SIZE - 1 / BLOCK_SIZE;
+    memset(block_buff, 0xFF, BLOCK_SIZE);
+    for(int i = 0; i < temp + 1; i++)
+    {
+        device_write(block_buff, fat_offset, SECTOR_NUM);
+    }
     sb->root.block_num = fat_offset + sb->fat_table_size;
     sb->root.file_size = 0;
     sb->root.type = FAT_TYPE_DIR;
@@ -443,3 +460,4 @@ int fat_ftrunc(file_desc* fd, uint32_t size)
 
     return 0;
 }
+

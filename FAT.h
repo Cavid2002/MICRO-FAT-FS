@@ -86,6 +86,7 @@ static super_block* sb;
 static uint8_t* block_buff;
 static uint32_t fat_offset;
 
+int fat_umount(fat_cb* cb);
 int fat_mount(fat_cb* cb, uint32_t part_start);
 int fat_create(fat_cb* cb, uint32_t part_start, uint32_t sector_num);
 uint32_t fat_alloc_block();

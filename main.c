@@ -32,13 +32,13 @@ void disk_stop()
 
 int main()
 {
-    disk_start();
+    if(disk_start() != 0) return -1;
     device_read = disk_read;
     device_write = disk_write;
 
     fat_cb cb;
 
-    // fat_create(&cb, 0, 65536);
+    fat_create(&cb, 0, 65536);
     if(fat_mount(&cb, 0))
     {
         printf("FAT DETECTED!!\n");
@@ -55,6 +55,8 @@ int main()
         printf("FAIL\n");
     }
 
+
+    fat_umount(&cb);
     disk_stop();
     return 0;
 
