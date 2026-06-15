@@ -36,7 +36,7 @@ int fat_create(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
     fat_offset = part_start + 1;
     sb->fat_magic = FAT_MAGIC;
     sb->block_size = BLOCK_SIZE;
-    sb->total_block_num = sector_num * 512 / BLOCK_SIZE;
+    sb->total_block_num = (sector_num * 512) / BLOCK_SIZE;
     sb->fat_table_size = (sb->total_block_num * 4 + BLOCK_SIZE - 1) / BLOCK_SIZE;
     sb->free_block_num = sb->total_block_num - sb->fat_table_size - 1;
     memset(block_buff, 0, BLOCK_SIZE);
@@ -46,16 +46,27 @@ int fat_create(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
         device_write(block_buff, fat_offset + i, SECTOR_NUM);
     }
 
-    uint32_t temp = sb->fat_table_size * 4  + BLOCK_SIZE - 1 / BLOCK_SIZE;
+    int i = 0;
+    uint32_t temp = sb->fat_table_size * 4;
     memset(block_buff, 0xFF, BLOCK_SIZE);
-    for(int i = 0; i < temp + 1; i++)
+    
+    for(i = 0; i < temp / ADR_PER_BLOCK; i++)
     {
-        device_write(block_buff, fat_offset, SECTOR_NUM);
+        device_write(block_buff, fat_offset + i, SECTOR_NUM);
     }
-    sb->root.block_num = fat_offset + sb->fat_table_size;
+    
+    if(temp % ADR_PER_BLOCK != 0)
+    {
+        memset(block_buff + temp % ADR_PER_BLOCK, 
+                0x00, 
+                BLOCK_SIZE - temp % ADR_PER_BLOCK);
+        device_write(block_buff, fat_offset + i, SECTOR_NUM);
+    }
+
+    sb->root.block_num = fat_alloc_block();
     sb->root.file_size = 0;
     sb->root.type = FAT_TYPE_DIR;
-    sb->root.dir_block = fat_offset + sb->fat_table_size;
+    sb->root.dir_block = sb->root.block_num;
 
     memcpy(sb, block_buff, sizeof(super_block));
     device_write(block_buff, part_start, SECTOR_NUM);
@@ -78,6 +89,7 @@ uint32_t fat_alloc_block()
             {
                 addr[j] = EOC;
                 device_write(block_buff, fat_offset + i, SECTOR_NUM);
+                sb->total_block_num--;
                 return (fat_offset + i) * ADR_PER_BLOCK + j;
             }
         }
@@ -392,7 +404,7 @@ int fat_fopen(file_desc* fd, char* path, uint8_t mode)
         {
             fd->fdir = res;
             fd->curr_block = res.block_num;
-            fd->offset = 0;
+            fd->offset = res.file_size * (mode & FAT_MODE_APPEND);
             return 0;
         }
 
