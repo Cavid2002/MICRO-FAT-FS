@@ -38,7 +38,7 @@ int main()
 
     fat_cb cb;
 
-    fat_create(&cb, 0, 1048576);
+    // fat_mkfs(&cb, 0, 1048576);
     if(fat_mount(&cb, 0))
     {
         printf("FAT DETECTED!!\n");

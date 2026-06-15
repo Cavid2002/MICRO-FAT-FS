@@ -28,7 +28,7 @@ int fat_umount(fat_cb* cb)
     return 0;
 }
 
-int fat_create(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
+int fat_mkfs(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
 {
     fat_offset = part_start + 1;
     sb = &cb->s_block;
@@ -41,29 +41,29 @@ int fat_create(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
     sb->free_block_num = sb->total_block_num - sb->fat_table_size - 1;
     memset(block_buff, 0, BLOCK_SIZE);
 
-    for(int i = 0; i < sb->fat_table_size + 1; i++)
+    for(int i = 0; i < sb->fat_table_size; i++)
     {
         device_write(block_buff, fat_offset + i, SECTOR_NUM);
     }
 
-    int i = 0;
-    uint32_t temp = sb->fat_table_size * 4;
-    memset(block_buff, 0xFF, BLOCK_SIZE);
+    // int i = 0;
+    // uint32_t temp = (sb->fat_table_size + 1) * 4;
+    // memset(block_buff, 0xFF, BLOCK_SIZE);
     
-    for(i = 0; i < temp / ADR_PER_BLOCK; i++)
-    {
-        device_write(block_buff, fat_offset + i, SECTOR_NUM);
-    }
+    // for(i = 0; i < temp / ADR_PER_BLOCK; i++)
+    // {
+    //     device_write(block_buff, fat_offset + i, SECTOR_NUM);
+    // }
     
-    if(temp % ADR_PER_BLOCK != 0)
-    {
-        memset(block_buff + temp % ADR_PER_BLOCK, 
-                0x00, 
-                BLOCK_SIZE - temp % ADR_PER_BLOCK);
-        device_write(block_buff, fat_offset + i, SECTOR_NUM);
-    }
+    // if(temp % ADR_PER_BLOCK != 0)
+    // {
+    //     memset(block_buff + temp % ADR_PER_BLOCK, 
+    //             0x00, 
+    //             BLOCK_SIZE - temp % ADR_PER_BLOCK);
+    //     device_write(block_buff, fat_offset + i, SECTOR_NUM);
+    // }
 
-    sb->root.block_num = fat_alloc_block();
+    // sb->root.block_num = fat_alloc_block();
     sb->root.file_size = 0;
     sb->root.type = FAT_TYPE_DIR;
     sb->root.dir_block = sb->root.block_num;

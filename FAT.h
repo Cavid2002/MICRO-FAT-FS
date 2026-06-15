@@ -88,7 +88,7 @@ static uint32_t fat_offset;
 
 int fat_umount(fat_cb* cb);
 int fat_mount(fat_cb* cb, uint32_t part_start);
-int fat_create(fat_cb* cb, uint32_t part_start, uint32_t sector_num);
+int fat_mkfs(fat_cb* cb, uint32_t part_start, uint32_t sector_num);
 uint32_t fat_alloc_block();
 void fat_free_block(uint32_t block_num);
 uint32_t fat_next_block(uint32_t current_block);
