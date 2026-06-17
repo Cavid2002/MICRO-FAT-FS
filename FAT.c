@@ -39,31 +39,27 @@ int fat_mkfs(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
     sb->total_block_num = (sector_num * 512) / BLOCK_SIZE;
     sb->fat_table_size = (sb->total_block_num * 4 + BLOCK_SIZE - 1) / BLOCK_SIZE;
     sb->free_block_num = sb->total_block_num - sb->fat_table_size - 1;
-    memset(block_buff, 0, BLOCK_SIZE);
 
+    memset(block_buff, 0, BLOCK_SIZE);
     for(int i = 0; i < sb->fat_table_size; i++)
     {
         device_write(block_buff, fat_offset + i, SECTOR_NUM);
     }
 
-    // int i = 0;
-    // uint32_t temp = (sb->fat_table_size + 1) * 4;
-    // memset(block_buff, 0xFF, BLOCK_SIZE);
+    int i = 0;
+    uint32_t temp = (sb->fat_table_size + 1);
+    memset(block_buff, 0xFF, BLOCK_SIZE);
 
-    // for(i = 0; i < temp / ADR_PER_BLOCK; i++)
-    // {
-    //     device_write(block_buff, fat_offset + i, SECTOR_NUM);
-    // }
+    for(i = 0; i < temp / ADR_PER_BLOCK; i++)
+    {
+        device_write(block_buff, fat_offset + i, SECTOR_NUM);
+    }
+    memset(block_buff, 0, BLOCK_SIZE);
+    memset(block_buff + ((temp % ADR_PER_BLOCK) * sizeof(uint32_t)), 0xFF, (temp % ADR_PER_BLOCK) * sizeof(uint32_t));
+    device_write(block_buff, fat_offset + i, SECTOR_NUM);
 
-    // if(temp % ADR_PER_BLOCK != 0)
-    // {
-    //     memset(block_buff + temp % ADR_PER_BLOCK,
-    //             0x00,
-    //             BLOCK_SIZE - temp % ADR_PER_BLOCK);
-    //     device_write(block_buff, fat_offset + i, SECTOR_NUM);
-    // }
 
-    // sb->root.block_num = fat_alloc_block();
+    sb->root.block_num = fat_alloc_block();
     sb->root.file_size = 0;
     sb->root.type = FAT_TYPE_DIR;
     sb->root.dir_block = sb->root.block_num;
@@ -77,10 +73,11 @@ int fat_mkfs(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
 uint32_t fat_alloc_block()
 {
     uint32_t* addr = (uint32_t*)block_buff;
-    uint32_t next = sb->total_block_num - sb->free_block_num;
+    uint32_t next = sb->total_block_num - sb->free_block_num - 1;
     uint32_t block_offset = next / ADR_PER_BLOCK;
     uint32_t internal_offset = next % ADR_PER_BLOCK;
-    for(int i = block_offset; i < sb->total_block_num; i++)
+    uint32_t res = 0;
+    for(int i = block_offset; i < sb->fat_table_size; i++)
     {
         device_read(block_buff, fat_offset + i, SECTOR_NUM);
         for(int j = internal_offset; j < ADR_PER_BLOCK; j++)
@@ -89,10 +86,12 @@ uint32_t fat_alloc_block()
             {
                 addr[j] = EOC;
                 device_write(block_buff, fat_offset + i, SECTOR_NUM);
-                sb->total_block_num--;
-                return (fat_offset + i) * ADR_PER_BLOCK + j;
+                sb->free_block_num--;
+                res = (i * ADR_PER_BLOCK + j) + fat_offset;
+                return res;
             }
         }
+        internal_offset = 0;
     }
     return FAT_ERR_NO_SPC;
 }

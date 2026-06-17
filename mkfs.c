@@ -38,33 +38,7 @@ int main()
 
     fat_cb cb;
 
-    if(fat_mount(&cb, 0))
-    {
-        printf("FAT DETECTED!!\n");
-    }
-
-    file_desc fd;
-    char path[] = "/test.txt";
-    if(fat_fopen(&fd, path, FAT_MODE_CREATE | FAT_MODE_WRITE) == 0)
-    {
-        printf("FILE OPENED!\n");
-    }
-    else
-    {
-        printf("FAIL\n");
-    }
-
-
-    char buff[20] = "HELLO WORLD!";
-    char temp[20];
-    fat_fwrite(&fd, (uint8_t*)buff, 13);
-    fat_fseek(&fd, 0, FAT_SEEK_SET);
-    fat_fread(&fd, (uint8_t*)temp, 13);
-
-    printf("%s\n", temp);
-
-    fat_fclose(&fd);
-
+    fat_mkfs(&cb, 0, 1048576);
 
     fat_umount(&cb);
     disk_stop();
