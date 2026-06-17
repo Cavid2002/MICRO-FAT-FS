@@ -15,13 +15,13 @@ int disk_start()
 uint32_t disk_write(uint8_t* buff, uint32_t lba, uint32_t sectors)
 {
     fseek(disk, lba * BLOCK_SIZE, SEEK_SET);
-    return fwrite(buff, 1, SECTOR_NUM * sectors, disk);
+    return fwrite(buff, 1, BLOCK_SIZE * sectors, disk);
 }
 
 uint32_t disk_read(uint8_t* buff, uint32_t lba, uint32_t sectors)
 {
     fseek(disk, lba * BLOCK_SIZE, SEEK_SET);
-    return fread(buff, 1, SECTOR_NUM * sectors, disk);
+    return fread(buff, 1, BLOCK_SIZE * sectors, disk);
 }
 
 
@@ -38,7 +38,7 @@ int main()
 
     fat_cb cb;
 
-    // fat_mkfs(&cb, 0, 1048576);
+    fat_mkfs(&cb, 0, 1048576);
     if(fat_mount(&cb, 0))
     {
         printf("FAT DETECTED!!\n");

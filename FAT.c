@@ -49,16 +49,16 @@ int fat_mkfs(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
     // int i = 0;
     // uint32_t temp = (sb->fat_table_size + 1) * 4;
     // memset(block_buff, 0xFF, BLOCK_SIZE);
-    
+
     // for(i = 0; i < temp / ADR_PER_BLOCK; i++)
     // {
     //     device_write(block_buff, fat_offset + i, SECTOR_NUM);
     // }
-    
+
     // if(temp % ADR_PER_BLOCK != 0)
     // {
-    //     memset(block_buff + temp % ADR_PER_BLOCK, 
-    //             0x00, 
+    //     memset(block_buff + temp % ADR_PER_BLOCK,
+    //             0x00,
     //             BLOCK_SIZE - temp % ADR_PER_BLOCK);
     //     device_write(block_buff, fat_offset + i, SECTOR_NUM);
     // }
