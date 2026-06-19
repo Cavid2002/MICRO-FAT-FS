@@ -3,11 +3,12 @@
 
 uint32_t memset(void* ptr, uint8_t c, uint32_t size)
 {
-    while(--size)
+    int i = 0;
+    while(i < size)
     {
-        ((uint8_t*)ptr)[size] = c;
+        ((uint8_t*)ptr)[i++] = c;
     }
-    return size;
+    return i;
 }
 
 uint32_t memcpy(void* src, void* dest, uint32_t count)

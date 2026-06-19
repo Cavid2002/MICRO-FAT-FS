@@ -345,7 +345,8 @@ dir_entry fat_new_dir_entry(char* filename, uint32_t dir_block, uint8_t type)
 
     memset(&new_file, 0, sizeof(dir_entry));
     new_file.block_num = fat_alloc_block();
-    new_file.file_size = size;
+    new_file.name_length = size;
+    new_file.file_size = 0;
     new_file.type = type;
     new_file.dir_block = dir_block;
     memcpy(filename, new_file.name, size);
