@@ -52,12 +52,13 @@ int main()
     else
     {
         printf("FAIL\n");
+        return 0;
     }
 
 
-    char buff[20] = "HELLO WORLD!";
+    char buff[1024] = "HELLO WORLD! Testing Data Precense in the file";
     char temp[20];
-    fat_fwrite(&fd, (uint8_t*)buff, 13);
+    fat_fwrite(&fd, (uint8_t*)buff, 1024);
     fat_fseek(&fd, 0, FAT_SEEK_SET);
     fat_fread(&fd, (uint8_t*)temp, 13);
 

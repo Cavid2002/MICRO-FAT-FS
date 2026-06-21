@@ -126,7 +126,7 @@ uint32_t fat_cluster_insert(uint32_t current, uint32_t next)
     addr[internal_offset] = next;
     return next;
 }
-
+#ifdef FAT_DIR_SUPPORT
 int fat_dir_read(dir_entry* dir, dir_entry* res, char* name)
 {
     uint32_t len = strlen(name);
@@ -233,6 +233,23 @@ int fat_dir_delete(dir_entry* fdir)
     return -1;
 }
 
+dir_entry fat_new_dir_entry(char* filename, uint32_t dir_block, uint8_t type)
+{
+    dir_entry new_file;
+    uint32_t size = strlen(filename);
+    size = size > MAX_FILE_NAME ? MAX_FILE_NAME : size;
+
+    memset(&new_file, 0, sizeof(dir_entry));
+    new_file.block_num = fat_alloc_block();
+    new_file.name_length = size;
+    new_file.file_size = 0;
+    new_file.type = type;
+    new_file.dir_block = dir_block;
+    memcpy(filename, new_file.name, size);
+    return new_file;
+}
+
+#endif
 
 uint32_t fat_fread(file_desc* fd, uint8_t* buff, uint32_t size)
 {
@@ -337,54 +354,9 @@ uint32_t fat_fwrite(file_desc* fd, uint8_t* buff, uint32_t size)
 }
 
 
-dir_entry fat_new_dir_entry(char* filename, uint32_t dir_block, uint8_t type)
-{
-    dir_entry new_file;
-    uint32_t size = strlen(filename);
-    size = size > MAX_FILE_NAME ? MAX_FILE_NAME : size;
 
-    memset(&new_file, 0, sizeof(dir_entry));
-    new_file.block_num = fat_alloc_block();
-    new_file.name_length = size;
-    new_file.file_size = 0;
-    new_file.type = type;
-    new_file.dir_block = dir_block;
-    memcpy(filename, new_file.name, size);
-    return new_file;
-}
 
-int fat_fcreate(char* path, uint8_t type)
-{
-    char* token = strtok(path, "/");
-    dir_entry next = sb->root;
-    dir_entry res = next;
-    uint8_t flag = 0;
-
-    while(token)
-    {
-        if(fat_dir_read(&next, &res, token) != 0)
-        {
-            flag = 1;
-            break;
-        }
-
-        token = strtok(NULL, token);
-        next = res;
-    }
-
-    if(flag == 0)
-    {
-        return FAT_ERR_EXT;
-    }
-
-    if(strtok(NULL, token) && flag)
-    {
-        return FAT_ERR_PATH_ERR;
-    }
-
-    res = fat_new_dir_entry(token, next.dir_block, type);
-    return 0;
-}
+#ifdef FAT_DIR_SUPPORT
 
 int fat_fopen(file_desc* fd, char* path, uint8_t mode)
 {
@@ -427,11 +399,58 @@ int fat_fopen(file_desc* fd, char* path, uint8_t mode)
     return -1;
 }
 
+int fat_fcreate(char* path, uint8_t type)
+{
+    char* token = strtok(path, "/");
+    dir_entry next = sb->root;
+    dir_entry res = next;
+    uint8_t flag = 0;
+
+    while(token)
+    {
+        if(fat_dir_read(&next, &res, token) != 0)
+        {
+            flag = 1;
+            break;
+        }
+
+        token = strtok(NULL, token);
+        next = res;
+    }
+
+    if(flag == 0)
+    {
+        return FAT_ERR_EXT;
+    }
+
+    if(strtok(NULL, token) && flag)
+    {
+        return FAT_ERR_PATH_ERR;
+    }
+
+    res = fat_new_dir_entry(token, next.dir_block, type);
+    return 0;
+}
+
+#else
+
+int fat_fopen(file_desc* fd, char* path, uint8_t mode)
+{
+
+}
+
+int fat_fcreate(char* path, uint8_t type)
+{
+    
+}
+
+#endif
+
 int fat_fclose(file_desc* fd)
 {
     if(fd->mode & FAT_MODE_WRITE)
     {
-        if(fd->offset == fd->fdir.file_size)
+        if(fd->offset <= fd->fdir.file_size)
             return 0;
         if(fd->offset > fd->fdir.file_size)
             fd->fdir.file_size = fd->offset;
