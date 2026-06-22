@@ -55,7 +55,7 @@ int fat_mkfs(fat_cb* cb, uint32_t part_start, uint32_t sector_num)
         device_write(block_buff, fat_offset + i, SECTOR_NUM);
     }
     memset(block_buff, 0, BLOCK_SIZE);
-    memset(block_buff + ((temp % ADR_PER_BLOCK) * sizeof(uint32_t)), 0xFF, (temp % ADR_PER_BLOCK) * sizeof(uint32_t));
+    memset(block_buff, 0xFF, (temp % ADR_PER_BLOCK) * sizeof(uint32_t));
     device_write(block_buff, fat_offset + i, SECTOR_NUM);
 
 
@@ -126,7 +126,8 @@ uint32_t fat_cluster_insert(uint32_t current, uint32_t next)
     addr[internal_offset] = next;
     return next;
 }
-#ifdef FAT_DIR_SUPPORT
+
+
 int fat_dir_read(dir_entry* dir, dir_entry* res, char* name)
 {
     uint32_t len = strlen(name);
@@ -182,7 +183,7 @@ int fat_dir_insert(dir_entry* dir, dir_entry* new_file)
     memset(block_buff, 0, BLOCK_SIZE);
     memcpy(new_file, block_buff, sizeof(dir_entry));
     device_write(block_buff, next, SECTOR_NUM);
-    return -1;
+    return 0;
 }
 
 
@@ -248,8 +249,6 @@ dir_entry fat_new_dir_entry(char* filename, uint32_t dir_block, uint8_t type)
     memcpy(filename, new_file.name, size);
     return new_file;
 }
-
-#endif
 
 uint32_t fat_fread(file_desc* fd, uint8_t* buff, uint32_t size)
 {
@@ -436,12 +435,32 @@ int fat_fcreate(char* path, uint8_t type)
 
 int fat_fopen(file_desc* fd, char* path, uint8_t mode)
 {
+    dir_entry next = sb->root;
+    dir_entry res = next;
 
-}
 
-int fat_fcreate(char* path, uint8_t type)
-{
-    
+    if(fat_dir_read(&next, &res, path) == 0)
+    {
+        fd->fdir = res;
+        fd->mode = mode;
+        fd->offset = (FAT_MODE_APPEND & mode) >> 3 * res.file_size;
+        fd->curr_block = res.block_num;
+        return 0;
+    }
+
+
+    if(mode & FAT_MODE_CREATE)
+    {
+        res = fat_new_dir_entry(path, next.block_num, FAT_TYPE_FILE);
+        fat_dir_insert(&next, &res);
+        fd->fdir = res;
+        fd->mode = mode;
+        fd->offset = 0;
+        fd->curr_block = res.block_num;
+        return 0;
+    }
+
+    return -1;
 }
 
 #endif

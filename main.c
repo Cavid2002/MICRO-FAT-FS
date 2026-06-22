@@ -44,7 +44,7 @@ int main()
     }
 
     file_desc fd;
-    char path[] = "/test.txt";
+    char path[] = "test.txt";
     if(fat_fopen(&fd, path, FAT_MODE_CREATE | FAT_MODE_WRITE) == 0)
     {
         printf("FILE OPENED!\n");

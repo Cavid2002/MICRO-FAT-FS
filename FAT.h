@@ -16,7 +16,7 @@
 #define ADR_PER_BLOCK           (BLOCK_SIZE / 4)
 #define DIR_PER_BLOCK           (BLOCK_SIZE / 32)
 #define MAX_FILE_NAME           16
-#define EOC                     0xFFFFFFFF
+#define EOC                     0xFFFFFFF7
 
 #define FAT_SEEK_SET            0
 #define FAT_SEEK_CUR            1

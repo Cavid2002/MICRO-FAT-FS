@@ -18,7 +18,7 @@ uint32_t memcpy(void* src, void* dest, uint32_t count)
     {
         ((uint8_t*)dest)[i] = ((uint8_t*)src)[i];
     }
-    return 0;
+    return i;
 }
 
 int memcmp(void* ptr1, void* ptr2, uint32_t count)
